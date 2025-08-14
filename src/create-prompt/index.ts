@@ -37,33 +37,25 @@ const DISALLOWED_TOOLS = ["WebSearch", "WebFetch"];
 export function buildAllowedToolsString(
   customAllowedTools?: string[],
   includeActionsTools: boolean = false,
-  useCommitSigning: boolean = false,
 ): string {
   let baseTools = [...BASE_ALLOWED_TOOLS];
 
   // Always include the comment update tool from the comment server
   baseTools.push("mcp__github_comment__update_claude_comment");
 
-  // Add commit signing tools if enabled
-  if (useCommitSigning) {
-    baseTools.push(
-      "mcp__github_file_ops__commit_files",
-      "mcp__github_file_ops__delete_files",
-    );
-  } else {
-    // When not using commit signing, add specific Bash git commands only
-    baseTools.push(
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(git status:*)",
-      "Bash(git diff:*)",
-      "Bash(git log:*)",
-      "Bash(git rm:*)",
-      "Bash(git config user.name:*)",
-      "Bash(git config user.email:*)",
-    );
-  }
+  // Always add commit tools for consistent handling
+  baseTools.push(
+    "mcp__github_file_ops__commit_files",
+    "mcp__github_file_ops__delete_files",
+  );
+
+  // Add git tools for status checking and viewing (but not committing)
+  baseTools.push(
+    "Bash(git status:*)",
+    "Bash(git diff:*)",
+    "Bash(git log:*)",
+    "Bash(git branch:*)",
+  );
 
   // Add GitHub Actions MCP tools if enabled
   if (includeActionsTools) {
@@ -409,57 +401,29 @@ function getCommitInstructions(
   eventData: EventData,
   githubData: FetchDataResult,
   context: PreparedContext,
-  useCommitSigning: boolean,
 ): string {
   const coAuthorLine =
     (githubData.triggerDisplayName ?? context.triggerUsername !== "Unknown")
       ? `Co-authored-by: ${githubData.triggerDisplayName ?? context.triggerUsername} <${context.triggerUsername}@users.noreply.github.com>`
       : "";
 
-  if (useCommitSigning) {
-    if (eventData.isPR && !eventData.claudeBranch) {
-      return `
-      - Push directly using mcp__github_file_ops__commit_files to the existing branch (works for both new and existing files).
+  // Always use MCP file ops for consistent and secure commit handling
+  if (eventData.isPR && !eventData.claudeBranch) {
+    return `
+      - Push directly using mcp__github_file_ops__commit_files to the existing PR branch (works for both new and existing files).
+      - IMPORTANT: The tool is configured to only allow commits to the current PR branch for security.
       - Use mcp__github_file_ops__commit_files to commit files atomically in a single commit (supports single or multiple files).
       - When pushing changes with this tool and the trigger user is not "Unknown", include a Co-authored-by trailer in the commit message.
       - Use: "${coAuthorLine}"`;
-    } else {
-      return `
+  } else {
+    const branchName = eventData.claudeBranch || eventData.baseBranch;
+    return `
       - You are already on the correct branch (${eventData.claudeBranch || "the PR branch"}). Do not create a new branch.
-      - Push changes directly to the current branch using mcp__github_file_ops__commit_files (works for both new and existing files)
+      - IMPORTANT: Only push to the branch '${branchName}'. The tool is configured to prevent commits to any other branch.
+      - Push changes using mcp__github_file_ops__commit_files (works for both new and existing files)
       - Use mcp__github_file_ops__commit_files to commit files atomically in a single commit (supports single or multiple files).
       - When pushing changes and the trigger user is not "Unknown", include a Co-authored-by trailer in the commit message.
       - Use: "${coAuthorLine}"`;
-    }
-  } else {
-    // Non-signing instructions
-    if (eventData.isPR && !eventData.claudeBranch) {
-      return `
-      - Use git commands via the Bash tool to commit and push your changes:
-        - Stage files: Bash(git add <files>)
-        - Commit with a descriptive message: Bash(git commit -m "<message>")
-        ${
-          coAuthorLine
-            ? `- When committing and the trigger user is not "Unknown", include a Co-authored-by trailer:
-          Bash(git commit -m "<message>\\n\\n${coAuthorLine}")`
-            : ""
-        }
-        - Push to the remote: Bash(git push origin HEAD)`;
-    } else {
-      const branchName = eventData.claudeBranch || eventData.baseBranch;
-      return `
-      - You are already on the correct branch (${eventData.claudeBranch || "the PR branch"}). Do not create a new branch.
-      - Use git commands via the Bash tool to commit and push your changes:
-        - Stage files: Bash(git add <files>)
-        - Commit with a descriptive message: Bash(git commit -m "<message>")
-        ${
-          coAuthorLine
-            ? `- When committing and the trigger user is not "Unknown", include a Co-authored-by trailer:
-          Bash(git commit -m "<message>\\n\\n${coAuthorLine}")`
-            : ""
-        }
-        - Push to the remote: Bash(git push origin ${branchName})`;
-    }
   }
 }
 
@@ -529,7 +493,6 @@ function substitutePromptVariables(
 export function generatePrompt(
   context: PreparedContext,
   githubData: FetchDataResult,
-  useCommitSigning: boolean,
   mode: Mode,
 ): string {
   if (context.overridePrompt) {
@@ -541,7 +504,7 @@ export function generatePrompt(
   }
 
   // Use the mode's prompt generator
-  return mode.generatePrompt(context, githubData, useCommitSigning);
+  return mode.generatePrompt(context, githubData);
 }
 
 /**
@@ -551,7 +514,6 @@ export function generatePrompt(
 export function generateDefaultPrompt(
   context: PreparedContext,
   githubData: FetchDataResult,
-  useCommitSigning: boolean = false,
 ): string {
   const {
     contextData,
@@ -708,7 +670,7 @@ ${context.directPrompt ? `   - CRITICAL: Direct user instructions were provided 
    B. For Straightforward Changes:
       - Use file system tools to make the change locally.
       - If you discover related tasks (e.g., updating tests), add them to the todo list.
-      - Mark each subtask as completed as you progress.${getCommitInstructions(eventData, githubData, context, useCommitSigning)}
+      - Mark each subtask as completed as you progress.${getCommitInstructions(eventData, githubData, context)}
       ${
         eventData.claudeBranch
           ? `- Provide a URL to create a PR manually in this format:
@@ -741,7 +703,7 @@ ${context.directPrompt ? `   - CRITICAL: Direct user instructions were provided 
    - Always update the GitHub comment to reflect the current todo state.
    - When all todos are completed, remove the spinner and add a brief summary of what was accomplished, and what was not done.
    - Note: If you see previous Claude comments with headers like "**Claude finished @user's task**" followed by "---", do not include this in your comment. The system adds this automatically.
-   - If you changed any files locally, you must update them in the remote branch via ${useCommitSigning ? "mcp__github_file_ops__commit_files" : "git commands (add, commit, push)"} before saying that you're done.
+   - If you changed any files locally, you must update them in the remote branch via mcp__github_file_ops__commit_files before saying that you're done.
    ${eventData.claudeBranch ? `- If you created anything in your branch, your comment must include the PR URL with prefilled title and body mentioned above.` : ""}
 
 Important Notes:
@@ -751,20 +713,11 @@ Important Notes:
 - You communicate exclusively by editing your single comment - not through any other means.
 - Use this spinner HTML when work is in progress: <img src="https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f" width="14px" height="14px" style="vertical-align: middle; margin-left: 4px;" />
 ${eventData.isPR && !eventData.claudeBranch ? `- Always push to the existing branch when triggered on a PR.` : `- IMPORTANT: You are already on the correct branch (${eventData.claudeBranch || "the created branch"}). Never create new branches when triggered on issues or closed/merged PRs.`}
-${
-  useCommitSigning
-    ? `- Use mcp__github_file_ops__commit_files for making commits (works for both new and existing files, single or multiple). Use mcp__github_file_ops__delete_files for deleting files (supports deleting single or multiple files atomically), or mcp__github__delete_file for deleting a single file. Edit files locally, and the tool will read the content from the same path on disk.
+- Use mcp__github_file_ops__commit_files for making commits (works for both new and existing files, single or multiple). Use mcp__github_file_ops__delete_files for deleting files (supports deleting single or multiple files atomically). Edit files locally, and the tool will read the content from the same path on disk.
   Tool usage examples:
   - mcp__github_file_ops__commit_files: {"files": ["path/to/file1.js", "path/to/file2.py"], "message": "feat: add new feature"}
-  - mcp__github_file_ops__delete_files: {"files": ["path/to/old.js"], "message": "chore: remove deprecated file"}`
-    : `- Use git commands via the Bash tool for version control (remember that you have access to these git commands):
-  - Stage files: Bash(git add <files>)
-  - Commit changes: Bash(git commit -m "<message>")
-  - Push to remote: Bash(git push origin <branch>) (NEVER force push)
-  - Delete files: Bash(git rm <files>) followed by commit and push
-  - Check status: Bash(git status)
-  - View diff: Bash(git diff)`
-}
+  - mcp__github_file_ops__delete_files: {"files": ["path/to/old.js"], "message": "chore: remove deprecated file"}
+  - Use Bash tool for git status checking: Bash(git status), Bash(git diff), Bash(git log), Bash(git branch --show-current)
 - Display the todo list as a checklist in the GitHub comment and mark things off as you go.
 - REPOSITORY SETUP INSTRUCTIONS: The repository's CLAUDE.md file(s) contain critical repo-specific setup instructions, development guidelines, and preferences. Always read and follow these files, particularly the root CLAUDE.md, as they provide essential context for working with the codebase effectively.
 - Use h3 headers (###) for section titles in your comments, not h1 headers (#).
@@ -788,7 +741,8 @@ What You CANNOT Do:
 - Submit formal GitHub PR reviews
 - Approve pull requests (for security reasons)
 - Post multiple comments (you only update your initial comment)
-- Execute commands outside the repository context${useCommitSigning ? "\n- Run arbitrary Bash commands (unless explicitly allowed via allowed_tools configuration)" : ""}
+- Run arbitrary Bash commands (unless explicitly allowed via allowed_tools configuration)
+- Execute commands outside the repository context
 - Perform branch operations (cannot merge branches, rebase, or perform other git operations beyond creating and pushing commits)
 - Modify files in the .github/workflows directory (GitHub App permissions do not allow workflow modifications)
 
@@ -843,12 +797,7 @@ export async function createPrompt(
     });
 
     // Generate the prompt directly
-    const promptContent = generatePrompt(
-      preparedContext,
-      githubData,
-      context.inputs.useCommitSigning,
-      mode,
-    );
+    const promptContent = generatePrompt(preparedContext, githubData, mode);
 
     // Log the final prompt to console
     console.log("===== FINAL PROMPT =====");
@@ -883,7 +832,6 @@ export async function createPrompt(
     const allAllowedTools = buildAllowedToolsString(
       combinedAllowedTools,
       hasActionsReadPermission,
-      context.inputs.useCommitSigning,
     );
     const allDisallowedTools = buildDisallowedToolsString(
       combinedDisallowedTools,

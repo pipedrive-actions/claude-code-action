@@ -84,7 +84,7 @@ describe("prepareMcpConfig", () => {
     processExitSpy.mockRestore();
   });
 
-  test("should return comment server when commit signing is disabled", async () => {
+  test("should return comment and file ops servers always", async () => {
     const result = await prepareMcpConfig({
       githubToken: "test-token",
       owner: "test-owner",
@@ -98,7 +98,7 @@ describe("prepareMcpConfig", () => {
     const parsed = JSON.parse(result);
     expect(parsed.mcpServers).toBeDefined();
     expect(parsed.mcpServers.github).not.toBeDefined();
-    expect(parsed.mcpServers.github_file_ops).not.toBeDefined();
+    expect(parsed.mcpServers.github_file_ops).toBeDefined();
     expect(parsed.mcpServers.github_comment).toBeDefined();
     expect(parsed.mcpServers.github_comment.env.GITHUB_TOKEN).toBe(
       "test-token",
@@ -159,7 +159,7 @@ describe("prepareMcpConfig", () => {
     expect(parsed.mcpServers).toBeDefined();
     expect(parsed.mcpServers.github).toBeDefined();
     expect(parsed.mcpServers.github_comment).toBeDefined();
-    expect(parsed.mcpServers.github_file_ops).not.toBeDefined();
+    expect(parsed.mcpServers.github_file_ops).toBeDefined();
     expect(parsed.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN).toBe(
       "test-token",
     );
@@ -207,7 +207,7 @@ describe("prepareMcpConfig", () => {
     const parsed = JSON.parse(result);
     expect(parsed.mcpServers).toBeDefined();
     expect(parsed.mcpServers.github).not.toBeDefined();
-    expect(parsed.mcpServers.github_file_ops).not.toBeDefined();
+    expect(parsed.mcpServers.github_file_ops).toBeDefined();
     expect(parsed.mcpServers.github_comment).toBeDefined();
   });
 

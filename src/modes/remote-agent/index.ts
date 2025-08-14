@@ -340,7 +340,6 @@ export const remoteAgentMode: Mode = {
     const allowedToolsString = buildAllowedToolsString(
       context.inputs.allowedTools,
       hasActionsReadPermission,
-      context.inputs.useCommitSigning,
     );
     const disallowedToolsString = buildDisallowedToolsString(
       context.inputs.disallowedTools,
@@ -425,27 +424,18 @@ function generateDispatchSystemPrompt(
       ? `Co-authored-by: ${triggerDisplayName ?? triggerUsername} <${triggerUsername}@users.noreply.github.com>`
       : "";
 
-  let commitInstructions = "";
-  if (context.inputs.useCommitSigning) {
-    commitInstructions = `- Use mcp__github_file_ops__commit_files and mcp__github_file_ops__delete_files to commit and push changes`;
-    if (coAuthorLine) {
-      commitInstructions += `
-- When pushing changes, include a Co-authored-by trailer in the commit message
-- Use: "${coAuthorLine}"`;
-    }
-  } else {
-    commitInstructions = `- Use git commands via the Bash tool to commit and push your changes:
-  - Stage files: Bash(git add <files>)
-  - Commit with a descriptive message: Bash(git commit -m "<message>")`;
-    if (coAuthorLine) {
-      commitInstructions += `
-  - When committing, include a Co-authored-by trailer:
-    Bash(git commit -m "<message>\\n\\n${coAuthorLine}")`;
-    }
+  // Always use MCP file ops for consistent commit handling
+  let commitInstructions = `- Use mcp__github_file_ops__commit_files and mcp__github_file_ops__delete_files to commit changes
+  - IMPORTANT: Only commit to the branch that was created/designated for this task (${claudeBranch || "the current branch"})
+  - The tools are configured to prevent commits to any other branch`;
+  if (coAuthorLine) {
     commitInstructions += `
-  - Be sure to follow your commit message guidelines
-  - Push to the remote: Bash(git push origin HEAD)`;
+  - When committing, include a Co-authored-by trailer in the commit message
+  - Use: "${coAuthorLine}"`;
   }
+  commitInstructions += `
+  - Be sure to follow your commit message guidelines
+  - Check branch status with: Bash(git branch --show-current), Bash(git status)`;
 
   return `You are Claude, an AI assistant designed to help with GitHub issues and pull requests. Think carefully as you analyze the context and respond appropriately. Here's the context for your current task:
 

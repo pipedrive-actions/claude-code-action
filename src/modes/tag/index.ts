@@ -126,9 +126,8 @@ export const tagMode: Mode = {
   generatePrompt(
     context: PreparedContext,
     githubData: FetchDataResult,
-    useCommitSigning: boolean,
   ): string {
-    return generateDefaultPrompt(context, githubData, useCommitSigning);
+    return generateDefaultPrompt(context, githubData);
   },
 
   getSystemPrompt() {

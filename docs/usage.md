@@ -75,7 +75,7 @@ jobs:
 | `settings`                     | Claude Code settings as JSON string or path to settings JSON file                                                                     | No       | ""        |
 | `additional_permissions`       | Additional permissions to enable. Currently supports 'actions: read' for viewing workflow results                                     | No       | ""        |
 | `experimental_allowed_domains` | Restrict network access to these domains only (newline-separated).                                                                    | No       | ""        |
-| `use_commit_signing`           | Enable commit signing using GitHub's commit signature verification. When false, Claude uses standard git commands                     | No       | `false`   |
+| `use_commit_signing`           | **DEPRECATED** Enable commit signing using GitHub's commit signature verification. When false, Claude uses standard git commands      | No       | `true`    |
 
 \*Required when using direct Anthropic API (default and when not using Bedrock or Vertex)
 

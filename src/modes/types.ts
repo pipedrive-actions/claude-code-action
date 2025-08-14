@@ -61,11 +61,7 @@ export type Mode = {
    * Generates the prompt for this mode.
    * @returns The complete prompt string
    */
-  generatePrompt(
-    context: PreparedContext,
-    githubData: FetchDataResult,
-    useCommitSigning: boolean,
-  ): string;
+  generatePrompt(context: PreparedContext, githubData: FetchDataResult): string;
 
   /**
    * Prepares the GitHub environment for this mode.
