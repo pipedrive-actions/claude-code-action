@@ -136,7 +136,7 @@ runs:
   steps:
     - name: Install Bun
       if: inputs.path_to_bun_executable == ''
-      uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # https://github.com/oven-sh/setup-bun/releases/tag/v2.0.2
+      uses: pipedrive-actions/setup-bun@v2.0.1-pipedrive
       with:
         bun-version: 1.2.11
 
