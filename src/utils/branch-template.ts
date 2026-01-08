@@ -7,9 +7,12 @@
 const NUM_DESCRIPTION_WORDS = 5;
 
 /**
- * Extracts the first `numWords` words from a title and converts them to kebab-case
+ * Extracts the first 5 words from a title and converts them to kebab-case
  */
-function extractDescription(title: string, numWords: number = NUM_DESCRIPTION_WORDS): string {
+function extractDescription(
+  title: string,
+  numWords: number = NUM_DESCRIPTION_WORDS,
+): string {
   if (!title || title.trim() === "") {
     return "";
   }
