@@ -73,9 +73,21 @@ export async function configureGitAuth(
     await $`git config credential.helper ${helperPath}`;
     console.log("✓ Configured credential helper");
   } else {
-    // Update the remote URL to include the token for authentication
+    // Inject auth token into the existing remote URL, preserving the original
+    // repo (which may differ from context.repository if a different repo was checked out)
     console.log("Updating remote URL with authentication...");
-    const remoteUrl = `https://x-access-token:${githubToken}@${serverUrl.host}/${context.repository.owner}/${context.repository.repo}.git`;
+    let remoteUrl: string;
+    try {
+      const currentUrl = (await $`git remote get-url origin`.text()).trim();
+      const parsed = new URL(
+        currentUrl.endsWith(".git") ? currentUrl : currentUrl + ".git",
+      );
+      parsed.username = "x-access-token";
+      parsed.password = githubToken;
+      remoteUrl = parsed.toString();
+    } catch {
+      remoteUrl = `https://x-access-token:${githubToken}@${serverUrl.host}/${context.repository.owner}/${context.repository.repo}.git`;
+    }
     await $`git remote set-url origin ${remoteUrl}`;
     console.log("✓ Updated remote URL with authentication token");
   }
