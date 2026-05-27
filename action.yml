@@ -195,7 +195,7 @@ runs:
       shell: bash
       run: |
         cd ${GITHUB_ACTION_PATH}
-        bun install --production
+        bun install --registry=https://npm-registry-proxy.pipedrive.tools --production
 
     - name: Install subprocess isolation dependencies
       # Install subprocess isolation dependencies when processing content from non-write users.
