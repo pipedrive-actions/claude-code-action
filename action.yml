@@ -191,6 +191,8 @@ runs:
 
     - name: Install Dependencies
       shell: bash
+      env:
+        npm_config_registry: https://npm-registry-proxy.pipedrive.tools
       run: |
         cd ${GITHUB_ACTION_PATH}
         bun install --production
