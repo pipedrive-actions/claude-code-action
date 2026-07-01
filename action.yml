@@ -148,7 +148,7 @@ inputs:
   path_to_bun_executable:
     description: "Optional path to a custom Bun executable. If provided, skips automatic Bun installation and uses this executable instead. WARNING: Using an incompatible version may cause problems if the action requires specific Bun features. This input is typically not needed unless you're debugging something specific or have unique needs in your environment."
     required: false
-    default: ""
+    default: "/usr/local/bin/bun"
   display_report:
     description: "Whether to display the Claude Code Report in GitHub Step Summary. Set to 'false' to disable when using custom formatting solutions. WARNING: This outputs Claude-authored content in the GitHub Step Summary. This should only be used in cases where the action is used solely with trusted input."
     required: false
@@ -209,7 +209,7 @@ runs:
       shell: bash
       run: |
         cd ${GITHUB_ACTION_PATH}
-        bun install --production
+        bun install --registry=https://npm-registry-proxy.pipedrive.tools --production
 
     - name: Install subprocess isolation dependencies
       # Install subprocess isolation dependencies when processing content from non-write users.
