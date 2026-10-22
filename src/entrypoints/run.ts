@@ -53,12 +53,36 @@ export function buildInstallCommand(version: string): string {
   return `set -o pipefail; curl -fsSL https://claude.ai/install.sh | bash -s -- ${version}`;
 }
 
+// Exported for unit testing. The Agent SDK ships the matching Claude Code
+// binary in a per-platform optional dependency that `bun install` already
+// fetched. Using it skips the claude.ai download, which returns 429 when
+// many runners share an egress IP. Prefers glibc, falls back to musl.
+export function findBundledClaudeExecutable(
+  resolve: (specifier: string) => string = require.resolve,
+  platform: string = process.platform,
+  arch: string = process.arch,
+): string | undefined {
+  const pkg = `@anthropic-ai/claude-agent-sdk-${platform}-${arch}`;
+  const candidates = platform === "linux" ? [pkg, `${pkg}-musl`] : [pkg];
+  const binary = platform === "win32" ? "claude.exe" : "claude";
+  for (const candidate of candidates) {
+    try {
+      const path = resolve(`${candidate}/${binary}`);
+      if (existsSync(path)) return path;
+    } catch {
+      // Not installed for this platform; try the next candidate.
+    }
+  }
+  return undefined;
+}
+
 /**
  * Install Claude Code CLI, handling retry logic and custom executable paths.
  * Returns the absolute path to the claude executable.
  */
 async function installClaudeCode(): Promise<string> {
-  const customExecutable = process.env.PATH_TO_CLAUDE_CODE_EXECUTABLE;
+  const customExecutable =
+    process.env.PATH_TO_CLAUDE_CODE_EXECUTABLE || findBundledClaudeExecutable();
   if (customExecutable) {
     if (/[\x00-\x1f\x7f]/.test(customExecutable)) {
       throw new Error(
